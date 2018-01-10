@@ -60,16 +60,15 @@ int fputc(int ch, FILE *f)
 
  
  
+#if EN_USART1_RX   //如果使能了接收
 //串口1中断服务程序
 //注意,读取USARTx->SR能避免莫名其妙的错误   	
-//u8 USART_RX_BUF[USART_REC_LEN];     //接收缓冲,最大USART_REC_LEN个字节.
-u8 USART_RX_BUF[USART_REC_LEN] __attribute__ ((at(0X20001000)));//接收缓冲,最大USART_REC_LEN个字节,起始地址为0X20001000.   
+u8 USART_RX_BUF[USART_REC_LEN];     //接收缓冲,最大USART_REC_LEN个字节.
 //接收状态
 //bit15，	接收完成标志
 //bit14，	接收到0x0d
 //bit13~0，	接收到的有效字节数目
-u16 USART_RX_STA=0;       //接收状态标记	 
-u16 USART_RX_CNT=0;			//接收的字节数	 
+u16 USART_RX_STA=0;       //接收状态标记	  
   
 void uart_init(u32 bound){
   //GPIO端口设置
@@ -111,7 +110,7 @@ void uart_init(u32 bound){
   USART_Cmd(USART1, ENABLE);                    //使能串口1 
 
 }
-#if EN_USART1_RX   //如果使能了接收
+
 void USART1_IRQHandler(void)                	//串口1中断服务程序
 	{
 	u8 Res;
@@ -120,12 +119,26 @@ void USART1_IRQHandler(void)                	//串口1中断服务程序
 #endif
 	if(USART_GetITStatus(USART1, USART_IT_RXNE) != RESET)  //接收中断(接收到的数据必须是0x0d 0x0a结尾)
 		{
-		Res =USART_ReceiveData(USART1);//(USART1->DR);	//读取接收到的数据
-		if(USART_RX_CNT<USART_REC_LEN)
-		{
-			USART_RX_BUF[USART_RX_CNT]=Res;
-			USART_RX_CNT++;			 									     
-		} 		 
+		Res =USART_ReceiveData(USART1);	//读取接收到的数据
+		
+		if((USART_RX_STA&0x8000)==0)//接收未完成
+			{
+			if(USART_RX_STA&0x4000)//接收到了0x0d
+				{
+				if(Res!=0x0a)USART_RX_STA=0;//接收错误,重新开始
+				else USART_RX_STA|=0x8000;	//接收完成了 
+				}
+			else //还没收到0X0D
+				{	
+				if(Res==0x0d)USART_RX_STA|=0x4000;
+				else
+					{
+					USART_RX_BUF[USART_RX_STA&0X3FFF]=Res ;
+					USART_RX_STA++;
+					if(USART_RX_STA>(USART_REC_LEN-1))USART_RX_STA=0;//接收数据错误,重新开始接收	  
+					}		 
+				}
+			}   		 
      } 
 #if SYSTEM_SUPPORT_OS 	//如果SYSTEM_SUPPORT_OS为真，则需要支持OS.
 	OSIntExit();  											 

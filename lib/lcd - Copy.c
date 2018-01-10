@@ -506,22 +506,76 @@ void LCD_Display_Dir(u8 dir)
 		lcddev.dir=0;	//竖屏
 		lcddev.width=240;
 		lcddev.height=320;
-		
+		if(lcddev.id==0X9341||lcddev.id==0X6804||lcddev.id==0X5310)
+		{
 			lcddev.wramcmd=0X2C;
 	 		lcddev.setxcmd=0X2A;
 			lcddev.setycmd=0X2B;  	 
-			
-		
+			if(lcddev.id==0X6804||lcddev.id==0X5310)
+			{
+				lcddev.width=320;
+				lcddev.height=480;
+			}
+		}else if(lcddev.id==0x5510)
+		{
+			lcddev.wramcmd=0X2C00;
+	 		lcddev.setxcmd=0X2A00;
+			lcddev.setycmd=0X2B00; 
+			lcddev.width=480;
+			lcddev.height=800;
+		}else if(lcddev.id==0X1963)
+		{
+			lcddev.wramcmd=0X2C;	//设置写入GRAM的指令 
+			lcddev.setxcmd=0X2B;	//设置写X坐标指令
+			lcddev.setycmd=0X2A;	//设置写Y坐标指令
+			lcddev.width=480;		//设置宽度480
+			lcddev.height=800;		//设置高度800  
+		}else
+		{
+			lcddev.wramcmd=0X22;
+	 		lcddev.setxcmd=0X20;
+			lcddev.setycmd=0X21;  
+		}
 	}else 				//横屏
 	{	  				
 		lcddev.dir=1;	//横屏
 		lcddev.width=320;
 		lcddev.height=240;
-
+		if(lcddev.id==0X9341||lcddev.id==0X5310)
+		{
 			lcddev.wramcmd=0X2C;
 	 		lcddev.setxcmd=0X2A;
 			lcddev.setycmd=0X2B;  	 
-		
+		}else if(lcddev.id==0X6804)	 
+		{
+ 			lcddev.wramcmd=0X2C;
+	 		lcddev.setxcmd=0X2B;
+			lcddev.setycmd=0X2A; 
+		}else if(lcddev.id==0x5510)
+		{
+			lcddev.wramcmd=0X2C00;
+	 		lcddev.setxcmd=0X2A00;
+			lcddev.setycmd=0X2B00; 
+			lcddev.width=800;
+			lcddev.height=480;
+		}else if(lcddev.id==0X1963)
+		{
+			lcddev.wramcmd=0X2C;	//设置写入GRAM的指令 
+			lcddev.setxcmd=0X2A;	//设置写X坐标指令
+			lcddev.setycmd=0X2B;	//设置写Y坐标指令
+			lcddev.width=800;		//设置宽度800
+			lcddev.height=480;		//设置高度480  
+		}else
+		{
+			lcddev.wramcmd=0X22;
+	 		lcddev.setxcmd=0X21;
+			lcddev.setycmd=0X20;  
+		}
+		if(lcddev.id==0X6804||lcddev.id==0X5310)
+		{ 	 
+			lcddev.width=480;
+			lcddev.height=320; 			
+		}
 	} 
 	LCD_Scan_Dir(DFT_SCAN_DIR);	//默认扫描方向
 }	 
@@ -536,7 +590,8 @@ void LCD_Set_Window(u16 sx,u16 sy,u16 width,u16 height)
 	u16 twidth,theight;
 	twidth=sx+width-1;
 	theight=sy+height-1;
-	
+	if(lcddev.id==0X9341||lcddev.id==0X5310||lcddev.id==0X6804||(lcddev.dir==1&&lcddev.id==0X1963))
+	{
 		LCD_WR_REG(lcddev.setxcmd); 
 		LCD_WR_DATA(sx>>8); 
 		LCD_WR_DATA(sx&0XFF);	 
@@ -547,8 +602,56 @@ void LCD_Set_Window(u16 sx,u16 sy,u16 width,u16 height)
 		LCD_WR_DATA(sy&0XFF); 
 		LCD_WR_DATA(theight>>8); 
 		LCD_WR_DATA(theight&0XFF); 
+	}else if(lcddev.id==0X1963)//1963竖屏特殊处理
+	{
+		sx=lcddev.width-width-sx; 
+		height=sy+height-1; 
+		LCD_WR_REG(lcddev.setxcmd); 
+		LCD_WR_DATA(sx>>8); 
+		LCD_WR_DATA(sx&0XFF);	 
+		LCD_WR_DATA((sx+width-1)>>8); 
+		LCD_WR_DATA((sx+width-1)&0XFF);  
+		LCD_WR_REG(lcddev.setycmd); 
+		LCD_WR_DATA(sy>>8); 
+		LCD_WR_DATA(sy&0XFF); 
+		LCD_WR_DATA(height>>8); 
+		LCD_WR_DATA(height&0XFF); 		
+	}else if(lcddev.id==0X5510)
+	{
+		LCD_WR_REG(lcddev.setxcmd);LCD_WR_DATA(sx>>8);  
+		LCD_WR_REG(lcddev.setxcmd+1);LCD_WR_DATA(sx&0XFF);	  
+		LCD_WR_REG(lcddev.setxcmd+2);LCD_WR_DATA(twidth>>8);   
+		LCD_WR_REG(lcddev.setxcmd+3);LCD_WR_DATA(twidth&0XFF);   
+		LCD_WR_REG(lcddev.setycmd);LCD_WR_DATA(sy>>8);   
+		LCD_WR_REG(lcddev.setycmd+1);LCD_WR_DATA(sy&0XFF);  
+		LCD_WR_REG(lcddev.setycmd+2);LCD_WR_DATA(theight>>8);   
+		LCD_WR_REG(lcddev.setycmd+3);LCD_WR_DATA(theight&0XFF);  
+	}else	//其他驱动IC
+	{
+		if(lcddev.dir==1)//横屏
+		{
+			//窗口值
+			hsaval=sy;				
+			heaval=theight;
+			vsaval=lcddev.width-twidth-1;
+			veaval=lcddev.width-sx-1;				
+		}else
+		{ 
+			hsaval=sx;				
+			heaval=twidth;
+			vsaval=sy;
+			veaval=theight;
+		} 
+		hsareg=0X50;heareg=0X51;//水平方向窗口寄存器
+		vsareg=0X52;veareg=0X53;//垂直方向窗口寄存器	   							  
+		//设置寄存器值
+		LCD_WriteReg(hsareg,hsaval);
+		LCD_WriteReg(heareg,heaval);
+		LCD_WriteReg(vsareg,vsaval);
+		LCD_WriteReg(veareg,veaval);		
+		LCD_SetCursor(sx,sy);	//设置光标位置
+	}
 }
-
 //初始化lcd
 //该初始化函数可以初始化各种ALIENTEK出品的LCD液晶屏
 //本函数占用较大flash,用户可以根据自己的实际情况,删掉未用到的LCD初始化代码.以节省空间.
@@ -573,9 +676,58 @@ void LCD_Init(void)
 delay_ms(50); // delay 50 ms 
 	LCD_WriteReg(0x0000,0x0001);
 	delay_ms(50); // delay 50 ms 
-	lcddev.id=0X9341;
-	//9341初始化
-	 
+  	lcddev.id = LCD_ReadReg(0x0000);   
+	if(lcddev.id<0XFF||lcddev.id==0XFFFF||lcddev.id==0X9300)//读到ID不正确,新增lcddev.id==0X9300判断，因为9341在未被复位的情况下会被读成9300
+	{	
+ 		//尝试9341 ID的读取		
+		LCD_WR_REG(0XD3);				   
+		LCD_RD_DATA(); 				//dummy read 	
+ 		LCD_RD_DATA();   	    	//读到0X00
+  		lcddev.id=LCD_RD_DATA();   	//读取93								   
+ 		lcddev.id<<=8;
+		lcddev.id|=LCD_RD_DATA();  	//读取41 	   			   
+ 		if(lcddev.id!=0X9341)		//非9341,尝试是不是6804
+		{	
+ 			LCD_WR_REG(0XBF);				   
+			LCD_RD_DATA(); 			//dummy read 	 
+	 		LCD_RD_DATA();   	    //读回0X01			   
+	 		LCD_RD_DATA(); 			//读回0XD0 			  	
+	  		lcddev.id=LCD_RD_DATA();//这里读回0X68 
+			lcddev.id<<=8;
+	  		lcddev.id|=LCD_RD_DATA();//这里读回0X04	  
+			if(lcddev.id!=0X6804)	//也不是6804,尝试看看是不是NT35310
+			{ 
+				LCD_WR_REG(0XD4);				   
+				LCD_RD_DATA(); 				//dummy read  
+				LCD_RD_DATA();   			//读回0X01	 
+				lcddev.id=LCD_RD_DATA();	//读回0X53	
+				lcddev.id<<=8;	 
+				lcddev.id|=LCD_RD_DATA();	//这里读回0X10	 
+				if(lcddev.id!=0X5310)		//也不是NT35310,尝试看看是不是NT35510
+				{
+					LCD_WR_REG(0XDA00);	
+					LCD_RD_DATA();   		//读回0X00	 
+					LCD_WR_REG(0XDB00);	
+					lcddev.id=LCD_RD_DATA();//读回0X80
+					lcddev.id<<=8;	
+					LCD_WR_REG(0XDC00);	
+					lcddev.id|=LCD_RD_DATA();//读回0X00		
+					if(lcddev.id==0x8000)lcddev.id=0x5510;//NT35510读回的ID是8000H,为方便区分,我们强制设置为5510
+					if(lcddev.id!=0X5510)			//也不是NT5510,尝试看看是不是SSD1963
+					{
+						LCD_WR_REG(0XA1);
+						lcddev.id=LCD_RD_DATA();
+						lcddev.id=LCD_RD_DATA();	//读回0X57
+						lcddev.id<<=8;	 
+						lcddev.id|=LCD_RD_DATA();	//读回0X61	
+						if(lcddev.id==0X5761)lcddev.id=0X1963;//SSD1963读回的ID是5761H,为方便区分,我们强制设置为1963
+					}
+				}
+			}
+ 		}  	
+	}
+	if(lcddev.id==0X9341)	//9341初始化
+	{	 
 		LCD_WR_REG(0xCF);  
 		LCD_WR_DATAX(0x00); 
 		LCD_WR_DATAX(0xC1); 
@@ -668,7 +820,7 @@ delay_ms(50); // delay 50 ms
 		LCD_WR_REG(0x11); //Exit Sleep
 		delay_ms(120);
 		LCD_WR_REG(0x29); //display on	
-		
+	}	
 	LCD_Display_Dir(0);		 	//默认为竖屏
 	LCD_LED=1;					//点亮背光
 	LCD_Clear(WHITE);
