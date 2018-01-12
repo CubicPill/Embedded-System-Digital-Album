@@ -20,7 +20,7 @@
 //arr：自动重装值。
 //psc：时钟预分频数
 //这里使用的是定时器3!
-
+/*
 u8 ov_frame=0;
 
 
@@ -72,5 +72,5 @@ void TIM3_IRQHandler(void)   //TIM3中断
 
 
 
-
+*/
 

@@ -186,9 +186,8 @@ u16 LCD_ReadPoint(u16 x,u16 y)
  	u16 r,g,b;
 	if(x>=lcddev.width||y>=lcddev.height)return 0;	//超过了范围,直接返回		   
 	LCD_SetCursor(x,y);
-	if(lcddev.id==0X9341||lcddev.id==0X6804||lcddev.id==0X5310||lcddev.id==0X1963)LCD_WR_REG(0X2E);//9341/6804/3510/1963 发送读GRAM指令
-	else if(lcddev.id==0X5510)LCD_WR_REG(0X2E00);	//5510 发送读GRAM指令
-	else LCD_WR_REG(0X22);      		 			//其他IC发送读GRAM指令
+	LCD_WR_REG(0X2E);//9341/6804/3510/1963 发送读GRAM指令
+	
 	GPIOB->CRL=0X88888888; 							//PB0-7  上拉输入
 	GPIOB->CRH=0X88888888; 							//PB8-15 上拉输入
 	GPIOB->ODR=0XFFFF;     							//全部输出高
@@ -213,20 +212,13 @@ u16 LCD_ReadPoint(u16 x,u16 y)
 	opt_delay(2);//延时					   
  	r=DATAIN;  	//实际坐标颜色
 	LCD_RD_SET;
- 	if(lcddev.id==0X9341||lcddev.id==0X5310||lcddev.id==0X5510)	//9341/NT35310/NT35510要分2次读出
-	{	 
+ 	
 		LCD_RD_CLR;					   
 		opt_delay(2);//延时			   
 		b=DATAIN;//读取蓝色值  	  
 	 	LCD_RD_SET;
 		g=r&0XFF;//对于9341,第一次读取的是RG的值,R在前,G在后,各占8位
 		g<<=8;
-	}else if(lcddev.id==0X6804)
-	{
-		LCD_RD_CLR;					   
-	 	LCD_RD_SET;
-		r=DATAIN;//6804第二次读取的才是真实值 
-	}	 
 	LCD_CS_SET;
 	GPIOB->CRL=0X33333333; 		//PB0-7  上拉输出
 	GPIOB->CRH=0X33333333; 		//PB8-15 上拉输出
@@ -531,8 +523,8 @@ void LCD_Display_Dir(u8 dir)
 //窗体大小:width*height. 
 void LCD_Set_Window(u16 sx,u16 sy,u16 width,u16 height)
 {    
-	u8 hsareg,heareg,vsareg,veareg;
-	u16 hsaval,heaval,vsaval,veaval; 
+	//u8 hsareg,heareg,vsareg,veareg;
+	//u16 hsaval,heaval,vsaval,veaval; 
 	u16 twidth,theight;
 	twidth=sx+width-1;
 	theight=sy+height-1;
