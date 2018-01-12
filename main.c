@@ -14,6 +14,7 @@
 #include "camera.h"
 #include "touch.h"
 #include "album.h"
+#include "bmp.h"
 
 
 __inline void render_main_menu(void);
@@ -21,6 +22,7 @@ __inline void render_side_bar(void);
 int pixel_count = 76800;
 int main(void) {
     u16 mode;
+	u8 res;
     u8 option = 0;
     delay_init(); //延时函数初始化
     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2); // 设置中断优先级分组2
@@ -47,16 +49,25 @@ int main(void) {
         LCD_Fill(60, 150, 240, 150 + 16, WHITE); //清除显示			  
         delay_ms(200);
     }
+    mem_init();		
     exfuns_init();
-    mem_init();
     f_mount(fs, "0:", 1); //挂载SD卡 
-
+    res=f_mkdir("0:/DCIM");
+		if(res!=FR_EXIST&&res!=FR_OK) 	//发生了错误
+	{		    
+				LCD_Clear(WHITE);     
+        LCD_ShowString(60, 150, 200, 16, 16, "Folder Error!");
+		   delay_ms(2000);
+return 0;		
+	}
+	
     EXTI15_Init(); //使能定时器捕获
     OV7670_Window_Set(10, 174, 240, 320); //设置窗口	  
     OV7670_CS = 0;
 
     INIT:
-        render_main_menu();
+    BACK_COLOR=WHITE;
+		render_main_menu();
     pixel_count = 76800;
     mode = 0;
 
@@ -136,6 +147,7 @@ int main(void) {
                     delay_ms(100);
                 } else {
                     //take photo
+									save_picture();
                 }
 
             }
@@ -144,6 +156,8 @@ int main(void) {
 
     } else if (option == 1) {
         delay_ms(500);
+			            BACK_COLOR=WHITE;
+
         // album
         LCD_Clear(WHITE);
         LCD_ShowString(60, 150, 200, 16, 16, "Not implemented!");
