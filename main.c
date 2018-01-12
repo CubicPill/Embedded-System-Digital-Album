@@ -7,106 +7,146 @@
 #include "ov7670.h" 
 #include "exti.h" 
 #include "timer.h" 
-//ALIENTEK Mini STM32开发板扩展实验9
-//摄像头实验
-//技术支持：www.openedv.com
-//广州市星翼电子科技有限公司  
+#include "malloc.h"  
+#include "mmc_sd.h" 
+#include "ff.h"  
+#include "exfuns.h"
+#include "camera.h"
+#include "touch.h"
+#include "album.h"
 
-extern u8 ov_sta;	//在exit.c里面定义
-extern u8 ov_frame;	//在timer.c里面定义
 
-//更新LCD显示
-void camera_refresh(void)
-{
-	u32 j;
- 	u16 color;	
-  u16 r;
-  u16 g;
-  u16 b;	
-	u16 gray;
-	if(ov_sta==2)
-	{
-		LCD_Scan_Dir(U2D_L2R);		//从上到下,从左到右 
-		LCD_SetCursor(0x00,0x0000);	//设置光标位置 
-		// OV7670_Special_Effects(2);
-		LCD_WriteRAM_Prepare();     //开始写入GRAM	
- 		OV7670_CS=0;	 
- 		OV7670_RRST=0;				//开始复位读指针 
-		OV7670_RCK=0;
-		OV7670_RCK=1;
-		OV7670_RCK=0;
-		OV7670_RRST=1;				//复位读指针结束 
-		OV7670_RCK=1;  
-		for(j=0;j<76800;j++)
-		{
-			GPIOB->CRL=0X88888888;		   
-			OV7670_RCK=0; 
-			color=OV7670_DATA;		//读数据
-			OV7670_RCK=1; 	
-			color<<=8;					  
- 			OV7670_RCK=0;
-			color|=OV7670_DATA;		//读数据		  
-			OV7670_RCK=1; 
-			GPIOB->CRL=0X33333333;
-		  r=(color&0xf800)>>11;
-			g=(color&0x07e0)>>6;
-			b=color&0x0010;
-			gray=(r>>2)+(g>>2)+(b>>2);
-			gray=(gray>0x8)?0xffff:0x0;
-			r=gray;
-			g=gray;
-			b=gray;
-			color=(r<<11)|(g<<6)|b;
-			LCD_WR_DATA(color);	 
-		}  
- 		OV7670_CS=1; 							 
-		OV7670_RCK=0; 
-		OV7670_RCK=1; 
-		EXTI->PR=1<<15;     		//清除LINE8上的中断标志位
-		ov_sta=0;					//开始下一次采集
- 		ov_frame++; 
-		LCD_Scan_Dir(DFT_SCAN_DIR);	//恢复默认扫描方向 	  				 	 
-	} 
-}	  
- int main(void)
- {	
-	delay_init();	    	 //延时函数初始化
-	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);// 设置中断优先级分组2
-	uart_init(9600);
-	OV7670_Init();	
-	LED_Init();		  		//初始化与LED连接的硬件接口
-	LCD_Init();			   	//初始化LCD
-	if(lcddev.id==0X6804||lcddev.id==0X5310||lcddev.id==0X5510||lcddev.id==0X1963) //强制设置屏幕分辨率为320*240.以支持3.5寸大屏
-	{
-		lcddev.width=240;
-		lcddev.height=320; 
-	}
-	usmart_dev.init(72);	//初始化USMART	
-	
- 	POINT_COLOR=RED;//设置字体为红色 
-  LCD_DrawRectangle(70,80,170,140);
-  LCD_DrawRectangle(70,180,170,240);
-	LCD_ShowString(100,100,100,16,16,"Album");
-	LCD_ShowString(95,200,100,16,16,"Camera");
-	while(OV7670_Init())//初始化OV7670
-	{
-		LCD_ShowString(60,150,200,200,16,"OV7670 Error!!");
-		delay_ms(200);
-	    LCD_Fill(60,150,239,166,WHITE);
-		delay_ms(200);
-	}
- 	//LCD_ShowString(60,150,200,200,16,"OV7670 Init OK");
-	TIM3_Int_Init(10000,7199);			//TIM3,10Khz计数频率,1秒钟中断									  
-	EXTI15_Init();						//使能定时器捕获
-	OV7670_Window_Set(10,174,240,320);	//设置窗口	  
-  OV7670_CS=0;						 	 
- 	while(0){
-	delay_ms(1000);
-	}
-	while(1)
-	{	
- 		camera_refresh();	//更新显示	 
-		
-	}	   
+__inline void render_main_menu(void);
+__inline void render_side_bar(void);
+int pixel_count = 76800;
+int main(void) {
+    u16 mode;
+    u8 option = 0;
+    delay_init(); //延时函数初始化
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2); // 设置中断优先级分组2
+    uart_init(9600);
+    OV7670_Init();
+    LED_Init(); //初始化与LED连接的硬件接口
+    LCD_Init(); //初始化LCD
+    exfuns_init();
+    mem_init();
+    tp_dev.init();
+
+    usmart_dev.init(72); //初始化USMART	
+
+    while (OV7670_Init()) //初始化OV7670
+    {
+        LCD_ShowString(60, 150, 200, 200, 16, "OV7670 Error!!");
+        delay_ms(200);
+        LCD_Fill(60, 150, 239, 166, WHITE);
+        delay_ms(200);
+    }
+    EXTI15_Init(); //使能定时器捕获
+    OV7670_Window_Set(10, 174, 240, 320); //设置窗口	  
+    OV7670_CS = 0;
+
+    INIT:
+        render_main_menu();
+    pixel_count = 76800;
+    mode = 0;
+
+    option = 0;
+
+    while (!option) {
+        tp_dev.scan(0);
+        if (tp_dev.sta & TP_PRES_DOWN) {
+            if (tp_dev.x[0] <= 170 && tp_dev.x[0] >= 70 && tp_dev.y[0] <= 140 && tp_dev.y[0] >= 80) //触摸屏被按下
+            {
+
+                option = 1;
+
+            } else if (tp_dev.x[0] <= 170 && tp_dev.x[0] >= 70 && tp_dev.y[0] <= 240 && tp_dev.y[0] >= 180) {
+                option = 2;
+
+            }
+        }
+    }
+    if (option == 2) {
+			// camera
+        delay_ms(500);
+        while (1) {
+            tp_dev.scan(0);
+            if (tp_dev.sta & TP_PRES_DOWN) //触摸屏被按下
+            {
+
+                TP_Draw_Big_Point(tp_dev.x[0], tp_dev.y[0], RED); //画图	 
+                if (tp_dev.y[0] <= 100) {
+                    goto INIT;
+                } else if (tp_dev.y[0] > 100 && tp_dev.y[0] < 220) {
+                    //display filter selection
+                    render_side_bar();
+
+                    pixel_count = 57600;
+
+                    // enter filter selection
+
+                    while (1) {
+                        tp_dev.scan(0);
+                        if (tp_dev.sta & TP_PRES_DOWN) {
+                            if (tp_dev.x[0] >= 180) {
+                                if (tp_dev.y[0] <= 80) {
+                                    mode = 0;
+                                    break;
+                                } else if (tp_dev.y[0] > 80 && tp_dev.y[0] <= 160) {
+                                    mode = 1;
+                                    break;
+                                } else if (tp_dev.y[0] > 160 && tp_dev.y[0] <= 240) {
+                                    mode = 2;
+                                    break;
+                                } else if (tp_dev.y[0] > 240) {
+                                    mode = 3;
+                                    break;
+                                }
+
+                            }
+                        }
+                        camera_refresh(mode, pixel_count);
+                    }
+
+                    pixel_count = 76800;
+
+                    delay_ms(100);
+                } else {
+                    //take photo
+                }
+
+            }
+            camera_refresh(mode, pixel_count); //更新显示	 
+        }
+
+    } else if (option == 1) {
+			delay_ms(500);
+// album
+    }
+
+}
+
+__inline void render_main_menu(void) {
+    LCD_Clear(WHITE);
+    POINT_COLOR = BLACK;
+    LCD_DrawRectangle(70, 80, 170, 140);
+    LCD_DrawRectangle(70, 180, 170, 240);
+    LCD_ShowString(100, 100, 100, 16, 16, "Album");
+    LCD_ShowString(95, 200, 100, 16, 16, "Camera");
+
+}
+
+__inline void render_side_bar(void) {
+    LCD_Fill(180, 0, 240, 320, WHITE);
+    LCD_ShowChar(205, 30, 'N', 24, 1);
+    LCD_DrawLine(180, 80, 240, 80);
+
+    LCD_ShowChar(205, 110, 'R', 24, 1);
+    LCD_DrawLine(180, 160, 240, 160);
+
+    LCD_ShowChar(205, 190, 'G', 24, 1);
+    LCD_DrawLine(180, 240, 240, 240);
+
+    LCD_ShowChar(205, 270, 'B', 24, 1);
 }
 
