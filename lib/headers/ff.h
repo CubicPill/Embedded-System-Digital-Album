@@ -236,6 +236,11 @@ int f_puts (const TCHAR* str, FIL* cp);								/* Put a string to the file */
 int f_printf (FIL* fp, const TCHAR* str, ...);						/* Put a formatted string to the file */
 TCHAR* f_gets (TCHAR* buff, int len, FIL* fp);						/* Get a string from the file */
 
+FRESULT dir_sdi (
+	DIR* dp,		/* Pointer to directory object */
+	UINT idx		/* Index of directory table */
+);
+
 #define f_eof(fp) (((fp)->fptr == (fp)->fsize) ? 1 : 0)
 #define f_error(fp) ((fp)->err)
 #define f_tell(fp) ((fp)->fptr)

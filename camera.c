@@ -8,8 +8,7 @@
 #include "malloc.h"
 #include "delay.h"
 #include "bmp.h"
-
-extern u8 ov_sta; //在exit.c里面定义
+extern u8 ov_sta;
 u8 THRESHOLD = 0x10;
 const u8 MODE_NONE = 0;
 const u8 MODE_REVERT = 1;
@@ -124,6 +123,44 @@ void camera_new_pathname(u8 * pname) {
         if (res == FR_NO_FILE) {
             break;
         }
-        index++;
+        ++index;
     }
+}
+
+void render_side_bar(void) {
+    POINT_COLOR = BLACK;
+
+    LCD_Fill(180, 0, 240, 320, WHITE);
+    LCD_ShowChar(205, 30, 'N', 24, 1);
+    LCD_DrawLine(180, 80, 240, 80);
+    LCD_ShowChar(205, 110, 'R', 24, 1);
+    LCD_DrawLine(180, 160, 240, 160);
+    LCD_ShowChar(205, 190, 'G', 24, 1);
+    LCD_DrawLine(180, 240, 240, 240);
+    LCD_ShowChar(205, 270, 'B', 24, 1);
+}
+
+u8 set_camera_mode(u16 p, u16 * mode) {
+    if (p <= 80) {
+        LCD_Fill(180, 0, 240, 80, LIGHTBLUE);
+        LCD_ShowChar(205, 30, 'N', 24, 1);
+  			*mode = 0;
+        return 1;
+    } else if (p > 80 && p <= 160) {
+        LCD_Fill(180, 80, 240, 160, LIGHTBLUE);
+        LCD_ShowChar(205, 110, 'R', 24, 1); 
+			  *mode = 1;
+        return 1;
+    } else if (p > 160 && p <= 240) {
+        LCD_Fill(180, 160, 240, 240, LIGHTBLUE);
+        LCD_ShowChar(205, 190, 'G', 24, 1); 
+			  *mode = 2;
+        return 1;
+    } else if (p > 240) {
+        LCD_Fill(180, 240, 240, 320, LIGHTBLUE);
+        LCD_ShowChar(205, 270, 'B', 24, 1); 
+			  *mode = 3;
+        return 1;
+    }
+    return 0;
 }
